@@ -67,6 +67,35 @@ const config: Config = {
           error:   'var(--color-error)',
           info:    'var(--color-info)',
         },
+
+        // Legacy compatibility aliases (Famly-era names). Previously
+        // undefined — bg-sage/bg-sky/bg-gold/bg-terra etc. emitted NO CSS,
+        // which made primary CTAs invisible. Mapped onto the Clover family
+        // via tokens.css. Don't use in new code; don't mass-refactor old
+        // usages (Phase 6 cleanup).
+        sage: {
+          DEFAULT: 'var(--sage)',
+          light:   'var(--sage-light)',
+          pale:    'var(--sage-pale)',
+        },
+        sky: {
+          DEFAULT: 'var(--sky)',
+          light:   'var(--sky-light)',
+          pale:    'var(--sky-pale)',
+        },
+        gold: {
+          DEFAULT: 'var(--gold)',
+          dark:    'var(--gold-dark)',
+          pale:    'var(--gold-pale)',
+        },
+        terra: {
+          DEFAULT: 'var(--terra)',
+          light:   'var(--terra-light)',
+          pale:    'var(--terra-pale)',
+        },
+        cream:    'var(--cream)',
+        charcoal: 'var(--charcoal)',
+        mid:      'var(--mid)',
       },
 
       fontFamily: {
