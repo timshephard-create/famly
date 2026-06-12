@@ -19,11 +19,13 @@ create table if not exists public.support_tickets (
 
 alter table public.support_tickets enable row level security;
 
+drop policy if exists "users insert own tickets" on public.support_tickets;
 create policy "users insert own tickets"
   on public.support_tickets for insert
   to authenticated
   with check (auth.uid() = user_id);
 
+drop policy if exists "users read own tickets" on public.support_tickets;
 create policy "users read own tickets"
   on public.support_tickets for select
   to authenticated
@@ -58,3 +60,11 @@ $$;
 revoke execute on function public.increment_support_usage(text) from public;
 revoke execute on function public.increment_support_usage(text) from anon;
 revoke execute on function public.increment_support_usage(text) from authenticated;
+
+-- Explicit grants for the server role behind sb_secret_ keys. Revoking
+-- PUBLIC above also strips the implicit execute grant from service_role,
+-- and table grants are not guaranteed by default privileges — be explicit.
+grant usage on schema public to service_role;
+grant all on table public.support_tickets to service_role;
+grant all on table public.support_usage to service_role;
+grant execute on function public.increment_support_usage(text) to service_role;
