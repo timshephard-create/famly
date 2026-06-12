@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
+  testIgnore: 'unit/**', // vitest territory
   timeout: 60000,
   retries: 1,
   reporter: [['html'], ['list']],

@@ -72,6 +72,64 @@ export async function sendWelcomeEmail(
   }
 }
 
+export interface TicketNotificationData {
+  ticketId: string;
+  description: string;
+  email?: string;
+  page?: string;
+  tool?: string;
+  appVersion?: string;
+}
+
+const SUPPORT_NOTIFY_EMAIL = process.env.SUPPORT_NOTIFY_EMAIL || 'tim@kindora.world';
+
+/** Transactional notification to the founder when a support ticket lands. */
+export async function sendTicketNotification(data: TicketNotificationData): Promise<boolean> {
+  if (!BREVO_API_KEY) {
+    console.warn('[Brevo] Missing API key — skipping ticket notification');
+    return false;
+  }
+
+  const esc = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const htmlContent = `
+    <div style="font-family: Inter, sans-serif; max-width: 560px;">
+      <h2 style="color: ${BRAND_COLOR};">New support ticket</h2>
+      <p style="white-space: pre-wrap;">${esc(data.description)}</p>
+      <table style="font-size: 13px; color: #5C6664;">
+        <tr><td style="padding-right: 12px;">Ticket</td><td>${esc(data.ticketId)}</td></tr>
+        <tr><td>Page</td><td>${esc(data.page || '—')}</td></tr>
+        <tr><td>Tool</td><td>${esc(data.tool || '—')}</td></tr>
+        <tr><td>Reporter</td><td>${esc(data.email || 'anonymous')}</td></tr>
+        <tr><td>App version</td><td>${esc(data.appVersion || '—')}</td></tr>
+      </table>
+    </div>`;
+
+  try {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'api-key': BREVO_API_KEY,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: BREVO_FROM_NAME, email: BREVO_FROM_EMAIL },
+        to: [{ email: SUPPORT_NOTIFY_EMAIL, name: 'Kindora Support' }],
+        replyTo: data.email ? { email: data.email } : undefined,
+        subject: `[Support] ${data.tool || 'site'} — ticket ${data.ticketId.slice(0, 8)}`,
+        htmlContent,
+      }),
+    });
+    console.log('[Brevo] Ticket notification status:', res.status);
+    return res.ok;
+  } catch (err) {
+    console.error('[Brevo] Failed to send ticket notification:', err);
+    return false;
+  }
+}
+
 // --- Formatting helpers ---
 
 function fmt(n: number): string {

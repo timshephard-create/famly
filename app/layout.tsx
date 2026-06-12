@@ -3,6 +3,7 @@ import { DM_Sans, Inter, JetBrains_Mono } from 'next/font/google';
 import Script from 'next/script';
 import { Analytics } from '@vercel/analytics/react';
 import Nav from '@/components/Nav';
+import SupportWidget from '@/components/SupportWidget';
 import './globals.css';
 
 const dmSans = DM_Sans({
@@ -84,6 +85,7 @@ export default function RootLayout({
             </div>
           </div>
         </footer>
+        <SupportWidget />
         <Analytics />
         <Script src="https://www.googletagmanager.com/gtag/js?id=G-MSYQHTF19P" strategy="afterInteractive" />
         <Script id="ga4-init" strategy="afterInteractive">{`
