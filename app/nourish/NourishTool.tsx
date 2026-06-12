@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { TOOLS } from '@/config/platform';
+import { trackEvent } from '@/lib/analytics';
 import QuizShell from '@/components/QuizShell';
 import EmailCapture from '@/components/EmailCapture';
 import ErrorState from '@/components/ErrorState';
@@ -248,6 +249,7 @@ export default function NourishTool() {
   const [expandedDay, setExpandedDay] = useState(0);
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [instacartState, setInstacartState] = useState<'idle' | 'loading' | 'unavailable'>('idle');
 
   const handleComplete = useCallback(async (answers: Record<string, string | string[] | number>) => {
     setPhase('loading');
@@ -317,6 +319,28 @@ export default function NourishTool() {
       setTimeout(() => setCopied(false), 2000);
     });
   }, [results]);
+
+  // Shoppable list is a bonus, never a dependency: any failure quietly
+  // degrades to the plain list (copy/print still work).
+  const handleInstacart = useCallback(async () => {
+    if (!results || instacartState === 'loading') return;
+    setInstacartState('loading');
+    try {
+      const res = await fetch('/api/instacart/list', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ items: results.shoppingList }),
+      });
+      if (!res.ok) throw new Error(`instacart ${res.status}`);
+      const data = await res.json();
+      if (!data.url) throw new Error('no url');
+      trackEvent('instacart_list_created', { tool: tool.id });
+      window.open(data.url, '_blank', 'noopener');
+      setInstacartState('idle');
+    } catch {
+      setInstacartState('unavailable');
+    }
+  }, [results, instacartState]);
 
   if (phase === 'quiz') {
     return (
@@ -490,11 +514,22 @@ export default function NourishTool() {
 
         {/* ===== SHOPPING LIST ===== */}
         <section className="mb-8">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-display text-xl font-bold text-charcoal">
               Shopping List
             </h2>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              {process.env.NEXT_PUBLIC_INSTACART_ENABLED === 'true' &&
+                instacartState !== 'unavailable' && (
+                  <button
+                    onClick={handleInstacart}
+                    disabled={instacartState === 'loading'}
+                    data-testid="instacart-button"
+                    className="rounded-lg bg-clover px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-clover-dark disabled:opacity-40"
+                  >
+                    {instacartState === 'loading' ? 'Building list…' : 'Shop this list on Instacart'}
+                  </button>
+                )}
               <button
                 onClick={() => window.print()}
                 className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-mid hover:bg-cream"
@@ -509,6 +544,12 @@ export default function NourishTool() {
               </button>
             </div>
           </div>
+          {instacartState === 'unavailable' && (
+            <p className="mb-3 text-xs text-mid" data-testid="instacart-fallback">
+              Instacart&apos;s feed is napping — not you, them. Your list still works below: copy
+              it, print it, shop it.
+            </p>
+          )}
           <div className="space-y-4">
             {CATEGORIES.map(({ key, label, icon }) => {
               const items = results.shoppingList.filter(
