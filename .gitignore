@@ -49,3 +49,6 @@ public/swe-worker-*.js
 /test-results/
 /playwright-report/
 /blob-report/
+
+# Claude Code local config
+.claude/
