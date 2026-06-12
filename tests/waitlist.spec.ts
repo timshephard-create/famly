@@ -3,14 +3,15 @@ import { test, expect } from '@playwright/test';
 test.describe('Waitlist Page', () => {
   test('Waitlist page loads with all elements', async ({ page }) => {
     await page.goto('/waitlist');
-    await page.waitForLoadState('networkidle');
+    // networkidle never settles with live analytics beacons (Clarity/GA)
+    await page.waitForLoadState('domcontentloaded');
 
     // Page loads without error
     await expect(page.getByText('Oops')).not.toBeVisible();
 
     // Hero content
-    await expect(page.getByText('Kindora Premium')).toBeVisible();
-    await expect(page.getByText('founding member')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Kindora Premium/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /founding member/ })).toBeVisible();
 
     // Email form
     const form = page.locator('[data-testid="waitlist-page-form"]');
@@ -31,7 +32,8 @@ test.describe('Waitlist Page', () => {
 
   test('Form shows success state after submit', async ({ page }) => {
     await page.goto('/waitlist');
-    await page.waitForLoadState('networkidle');
+    // networkidle never settles with live analytics beacons (Clarity/GA)
+    await page.waitForLoadState('domcontentloaded');
 
     const form = page.locator('[data-testid="waitlist-page-form"]');
     await form.locator('input[type="email"]').fill('playwright-test@kindora-test.com');
