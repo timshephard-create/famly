@@ -124,6 +124,35 @@
   --z-overlay: 100;
   --z-modal:   1000;
   --z-toast:   2000;
+
+  /* ---------- Legacy compatibility aliases (Famly-era names) ----------
+     These names predate the v1.1 system and were never defined, so every
+     class/var using them emitted NO CSS (invisible CTA fills, slider
+     thumbs, progress bars). They are mapped onto the Clover family per
+     the locked brand spec — primary actions are Clover, hovers darken.
+     Do NOT use these in new code; write clover/apricot/shell directly.
+     Remove this block when the Phase 6 legacy-class cleanup lands. */
+  --sage:       var(--color-clover);
+  --sage-light: var(--color-clover-dark);
+  --sage-pale:  var(--color-clover-soft);
+
+  --sky:        var(--color-clover);
+  --sky-light:  var(--color-clover-dark);
+  --sky-pale:   var(--color-clover-soft);
+
+  --gold:       var(--color-clover);
+  --gold-dark:  var(--color-clover-dark);
+  --gold-pale:  var(--color-clover-soft);
+
+  --terra:       var(--color-clover);
+  --terra-light: var(--color-clover-dark);
+  --terra-pale:  var(--color-clover-soft);
+
+  --cream:    var(--color-shell);
+  --charcoal: var(--color-ink);
+  --mid:      var(--color-mute);
+  --white:    #FFFFFF;
+  --border:   var(--color-line);
 }
 
 @media (prefers-reduced-motion: reduce) {

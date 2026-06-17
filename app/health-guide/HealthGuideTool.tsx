@@ -714,9 +714,20 @@ export default function HealthGuideTool() {
         })
         .catch(() => setInsightLoading(false));
 
-      // Fetch CMS real plans + run decision engine
+      // Fetch CMS real plans + run decision engine.
+      // costResult (which powers the cash-pay + HSA sections) ONLY comes from
+      // this path, so fetch whenever those sections will show — not just for
+      // none/poor employer coverage. Otherwise an HDHP / HSA / tight-cash-flow
+      // profile with good employer coverage silently loses those sections.
       const zip = answers.zip as string;
-      if (zip && (profile.employerCoverage === 'none' || profile.employerCoverage === 'poor')) {
+      const needsCostDetail =
+        profile.employerCoverage === 'none' ||
+        profile.employerCoverage === 'poor' ||
+        answers.priority === 'want_hsa' ||
+        answers.employerHsa === 'yes' ||
+        answers.cashFlowComfort === 'tight' ||
+        answers.cashFlowComfort === 'no';
+      if (zip && needsCostDetail) {
         fetch('/api/health-plans', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -918,6 +929,24 @@ export default function HealthGuideTool() {
 
         {/* Part 4 — HSA Guide (eligible, wants HSA, or HSA plan recommended) */}
         {showHsaGuide && costResult && <HSAGuide hsaAnalysis={costResult.hsaAnalysis} />}
+
+        {/* Graceful degradation: these sections need live plan data (costResult).
+            If it couldn't be computed, say so explicitly — never render nothing. */}
+        {(showCashPay || showHsaGuide) && !costResult && !realPlansLoading && (
+          <section data-testid="cost-detail-unavailable" className="mt-10 rounded-xl border border-border bg-white p-6">
+            <h2 className="mb-2 font-display text-xl font-bold text-charcoal">
+              Cash-pay &amp; HSA guidance needs your local plan data
+            </h2>
+            <p className="text-sm text-mid">
+              We couldn&apos;t pull live marketplace plans for your area just now, so we&apos;re holding
+              back the cash-pay and HSA breakdown rather than show you numbers we can&apos;t stand behind.
+              Add or recheck your ZIP code and try again, or compare plans directly at{' '}
+              <a href="https://www.healthcare.gov" target="_blank" rel="noopener noreferrer" className="font-semibold text-sky underline">
+                healthcare.gov
+              </a>.
+            </p>
+          </section>
+        )}
 
         {/* Part 2 + 5 — All Options + Split Coverage */}
         <AllOptionsSection answers={quizAnswers} />

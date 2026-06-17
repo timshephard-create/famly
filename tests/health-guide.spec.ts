@@ -114,10 +114,18 @@ test.describe('HealthGuide', () => {
 
     await dismissEmailCapture(page);
     await waitForResults(page);
-
-    await expect(page.locator('[data-testid="cash-pay-section"]')).toBeVisible();
-    await expect(page.locator('[data-testid="hsa-guide"]')).toBeVisible();
     await assertNoError(page);
+
+    // Regression guard: an HDHP / want-HSA / tight-cash-flow profile must get
+    // the cash-pay and HSA sections even with good employer coverage. These
+    // need live CMS plan data (costResult); the fetch must run for this
+    // profile. FAIL — never skip — if the section is absent. The section
+    // computes from live CMS data, so wait for the live plan call to resolve.
+    await expect(page.locator('[data-testid="cash-pay-section"]')).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('[data-testid="hsa-guide"]')).toBeVisible();
+    // And it must never be the silent-empty render: the degradation note is
+    // the *fallback*, not the expected outcome for a ZIP with live plans.
+    await expect(page.locator('[data-testid="cost-detail-unavailable"]')).toHaveCount(0);
   });
 
   test('Profile 4 — Life change, above subsidy threshold', async ({ page }) => {
@@ -183,7 +191,7 @@ test.describe('HealthGuide', () => {
     await dismissEmailCapture(page);
 
     await page.waitForTimeout(8000);
-    await expect(page.locator('nav')).toContainText('Kindora');
+    await expect(page.locator('nav')).toContainText(/kindora/i);
     const bodyText = await page.textContent('body');
     expect(bodyText!.length).toBeGreaterThan(100);
   });

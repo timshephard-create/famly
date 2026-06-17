@@ -84,7 +84,7 @@ test.describe('Nourish', () => {
     await waitForResults(page, 60000);
 
     await expect(page.locator('[data-testid="results-container"]')).toBeVisible();
-    await expect(page.getByText('Shopping List')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Shopping List' })).toBeVisible();
     await assertNoError(page);
   });
 });
