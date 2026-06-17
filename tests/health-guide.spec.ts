@@ -114,16 +114,18 @@ test.describe('HealthGuide', () => {
 
     await dismissEmailCapture(page);
     await waitForResults(page);
-
-    // With live CMS Marketplace data, costResult can be null (field-shape
-    // differences vs. fallback plans), which suppresses these sections —
-    // tracked as a product investigation. Skip rather than fail when the
-    // section is absent but results rendered cleanly.
     await assertNoError(page);
-    const hasCashPay = (await page.locator('[data-testid="cash-pay-section"]').count()) > 0;
-    test.skip(!hasCashPay, 'cash-pay section absent with live CMS data — see product investigation');
-    await expect(page.locator('[data-testid="cash-pay-section"]')).toBeVisible();
+
+    // Regression guard: an HDHP / want-HSA / tight-cash-flow profile must get
+    // the cash-pay and HSA sections even with good employer coverage. These
+    // need live CMS plan data (costResult); the fetch must run for this
+    // profile. FAIL — never skip — if the section is absent. The section
+    // computes from live CMS data, so wait for the live plan call to resolve.
+    await expect(page.locator('[data-testid="cash-pay-section"]')).toBeVisible({ timeout: 30000 });
     await expect(page.locator('[data-testid="hsa-guide"]')).toBeVisible();
+    // And it must never be the silent-empty render: the degradation note is
+    // the *fallback*, not the expected outcome for a ZIP with live plans.
+    await expect(page.locator('[data-testid="cost-detail-unavailable"]')).toHaveCount(0);
   });
 
   test('Profile 4 — Life change, above subsidy threshold', async ({ page }) => {
