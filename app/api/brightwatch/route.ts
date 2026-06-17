@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { brightwatchInputSchema } from '@/lib/validations';
 import { validateRecommendation } from '@/lib/validate-ai-output';
+import { MODELS } from '@/config/models';
 import type { BrightWatchResponse } from '@/types';
 
 const anthropic = new Anthropic({
@@ -115,7 +116,10 @@ For each recommendation, include a "viewing_type" field: "together" if the conte
 For each recommendation, if you have any uncertainty about whether this content is currently available on the platform you're listing, flag it by adding "(verify availability)" after the platform name. Also note if a show may have been removed or moved to a different service since your training data.`;
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      // FLAG: BrightWatch stays on Sonnet in this hotfix to preserve current
+      // behavior. Brand spec §10 calls for Haiku here — that cost re-tier is a
+      // deliberate, separate decision, intentionally NOT made in this hotfix.
+      model: MODELS.sonnet,
       max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }],
     });

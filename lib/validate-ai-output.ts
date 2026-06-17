@@ -1,10 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { MODELS } from '@/config/models';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
 });
 
-const VALIDATION_MODEL = 'claude-haiku-4-5-20251001';
+const VALIDATION_MODEL = MODELS.haiku;
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY || '';
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || '';

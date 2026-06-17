@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { nourishInputSchema } from '@/lib/validations';
 import { validateRecommendation } from '@/lib/validate-ai-output';
+import { MODELS } from '@/config/models';
 import type { NourishResponse } from '@/types';
 import { z } from 'zod';
 
@@ -149,7 +150,7 @@ Requirements:
 - splitShoppingPlan: specific, actionable, names the actual nearby stores`;
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: MODELS.sonnet,
       max_tokens: 3500,
       messages: [{ role: 'user', content: prompt }],
     });

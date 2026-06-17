@@ -15,6 +15,7 @@ import {
   sessionCapped,
 } from '@/lib/support-guard';
 import { SUPPORT_SYSTEM_PROMPT } from '@/lib/support-kb';
+import { MODELS } from '@/config/models';
 
 const bodySchema = z.object({
   messages: z
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
   try {
     const anthropic = new Anthropic({ apiKey });
     const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: MODELS.haiku,
       max_tokens: 400,
       temperature: 0.2,
       system: SUPPORT_SYSTEM_PROMPT,
