@@ -31,7 +31,7 @@ test.describe('Nourish', () => {
     await waitForResults(page, 60000);
 
     await expect(page.locator('[data-testid="results-container"]')).toBeVisible();
-    await expect(page.getByText('Monday')).toBeVisible();
+    await expect(page.getByText('Monday', { exact: true })).toBeVisible();
     await expect(page.locator('[data-testid="disclaimer"]')).toBeVisible();
     await assertNoError(page);
   });
@@ -67,7 +67,7 @@ test.describe('Nourish', () => {
     await waitForResults(page, 60000);
 
     await expect(page.locator('[data-testid="results-container"]')).toBeVisible();
-    await expect(page.getByText('Monday')).toBeVisible();
+    await expect(page.getByText('Monday', { exact: true })).toBeVisible();
   });
 
   test('Profile 4 — Large family, tight budget', async ({ page }) => {
