@@ -3,8 +3,20 @@ import Anthropic from '@anthropic-ai/sdk';
 import { nourishInputSchema } from '@/lib/validations';
 import { validateRecommendation } from '@/lib/validate-ai-output';
 import { MODELS } from '@/config/models';
+import { getActor } from '@/lib/actor';
+import { logUsage } from '@/lib/usage-log';
+import { checkRateLimit, checkSpendCeiling, HIGH_DEMAND_MESSAGE } from '@/lib/spend-guard';
+import { scanPlanForAllergens } from '@/lib/allergens';
 import type { NourishResponse } from '@/types';
 import { z } from 'zod';
+
+/** Deterministic allergen safety net: attach warnings to ANY plan we return
+ *  (including fallbacks, which contain milk/PB&J/wheat) before it reaches the
+ *  user. Runs on top of the existing LLM validation check. */
+function withAllergens(plan: NourishResponse, dietary: string[]): NourishResponse {
+  const allergenWarnings = scanPlanForAllergens(plan, dietary);
+  return allergenWarnings.length > 0 ? { ...plan, allergenWarnings } : plan;
+}
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -79,7 +91,18 @@ export async function POST(request: NextRequest) {
     const { householdSize, budget, dietary, cookingTime, zip, nearbyStores } = parsed.data;
 
     if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ data: buildFallback() });
+      return NextResponse.json({ data: withAllergens(buildFallback(), dietary) });
+    }
+
+    // §4 protection: rate limit + spend ceiling before the paid call.
+    const actor = await getActor(request);
+    const rate = await checkRateLimit(actor.key);
+    if (!rate.allowed) {
+      return NextResponse.json({ error: HIGH_DEMAND_MESSAGE }, { status: 429 });
+    }
+    const ceiling = await checkSpendCeiling('meal');
+    if (!ceiling.allowed) {
+      return NextResponse.json({ data: withAllergens({ ...buildFallback(), degraded: true }, dietary) });
     }
 
     const dietaryStr = dietary.length === 0 || dietary.includes('none')
@@ -154,10 +177,11 @@ Requirements:
       max_tokens: 3500,
       messages: [{ role: 'user', content: prompt }],
     });
+    logUsage({ tool: 'meal', model: MODELS.sonnet, usage: message.usage, userId: actor.userId, ipHash: actor.ipHash });
 
     const textBlock = message.content.find((b) => b.type === 'text');
     if (!textBlock) {
-      return NextResponse.json({ data: buildFallback() });
+      return NextResponse.json({ data: withAllergens(buildFallback(), dietary) });
     }
 
     try {
@@ -169,19 +193,20 @@ Requirements:
       if (validation.flags.length > 0) {
         try {
           const safeguarded = JSON.parse(validation.safeguardedResponse) as NourishResponse;
-          return NextResponse.json({ data: safeguarded });
+          return NextResponse.json({ data: withAllergens(safeguarded, dietary) });
         } catch {
-          return NextResponse.json({ data });
+          return NextResponse.json({ data: withAllergens(data, dietary) });
         }
       }
 
-      return NextResponse.json({ data });
+      return NextResponse.json({ data: withAllergens(data, dietary) });
     } catch {
       console.error('[API /nourish] Failed to parse Claude response');
-      return NextResponse.json({ data: buildFallback() });
+      return NextResponse.json({ data: withAllergens(buildFallback(), dietary) });
     }
   } catch (err) {
     console.error('[API /nourish] Error:', err);
+    // Hard-error path: dietary may be unknown here, so no allergen context.
     return NextResponse.json({ data: buildFallback() });
   }
 }

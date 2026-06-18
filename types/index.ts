@@ -113,6 +113,17 @@ export interface NourishResponse {
   insight: string;
   storeStrategy?: NourishStoreStrategy[];
   splitShoppingPlan?: string;
+  /** Deterministic allergen scan results (Phase 4A). Present when the family
+   *  declared an allergen; UI renders an unmissable warning. */
+  allergenWarnings?: AllergenWarning[];
+  /** True when the plan was served from fallback due to the spend ceiling. */
+  degraded?: boolean;
+}
+
+export interface AllergenWarning {
+  allergen: string;
+  matchedTerms: string[];
+  affectedItems: string[];
 }
 
 export interface NearbyStore {

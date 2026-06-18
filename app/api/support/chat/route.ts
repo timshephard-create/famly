@@ -16,6 +16,7 @@ import {
 } from '@/lib/support-guard';
 import { SUPPORT_SYSTEM_PROMPT } from '@/lib/support-kb';
 import { MODELS } from '@/config/models';
+import { logUsage } from '@/lib/usage-log';
 
 const bodySchema = z.object({
   messages: z
@@ -102,6 +103,7 @@ export async function POST(req: NextRequest) {
       system: SUPPORT_SYSTEM_PROMPT,
       messages: messages.slice(-12).map((m) => ({ role: m.role, content: m.content })),
     });
+    logUsage({ tool: 'support', model: MODELS.haiku, usage: message.usage });
     const textBlock = message.content.find((b) => b.type === 'text');
     const reply = textBlock && 'text' in textBlock ? textBlock.text : FALLBACK_REPLY;
     return NextResponse.json({ reply, escalate });

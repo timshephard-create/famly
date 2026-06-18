@@ -396,6 +396,34 @@ export default function NourishTool() {
           7 days of meals optimized for your budget, preferences, and schedule.
         </p>
 
+        {/* Deterministic allergen warning — unmissable; names the allergen,
+            the exact matched terms, and the affected items so the family can
+            judge each one. */}
+        {results.allergenWarnings && results.allergenWarnings.length > 0 && (
+          <div
+            data-testid="allergen-warning"
+            role="alert"
+            className="mb-8 rounded-xl border-2 border-terra bg-terra-pale p-5"
+          >
+            <p className="font-display text-lg font-bold text-charcoal">
+              ⚠️ Heads up — this plan may contain an allergen you flagged
+            </p>
+            <p className="mt-1 text-sm text-charcoal">
+              We scan every plan against your declared allergies. Always read labels and confirm
+              before cooking. Here&apos;s what we matched:
+            </p>
+            <ul className="mt-3 space-y-2">
+              {results.allergenWarnings.map((w) => (
+                <li key={w.allergen} className="text-sm text-charcoal">
+                  <span className="font-semibold capitalize">{w.allergen}</span> — matched{' '}
+                  <span className="font-semibold">{w.matchedTerms.join(', ')}</span> in:{' '}
+                  <span className="text-mid">{w.affectedItems.join('; ')}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* AI Insight */}
         {results.insight && (
           <div className="mb-8">

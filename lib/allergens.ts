@@ -1,0 +1,116 @@
+import type { NourishResponse } from '@/types';
+
+/**
+ * Deterministic allergen safety net for Nourish — a CODE layer on top of the
+ * LLM validation check ("safety via determinism"). Scans the final plan for
+ * declared allergens using token-boundary matching against a curated
+ * derivatives list (NOT loose substring — avoids "butter lettuce" → milk).
+ *
+ * Bias: a missed allergen is far worse than a false flag, so the term list is
+ * generous AND the warning surfaces the exact matched terms so a user can
+ * judge a false positive at a glance.
+ */
+
+export type AllergenGroup =
+  | 'milk' | 'egg' | 'peanut' | 'treenut' | 'wheat' | 'soy' | 'fish' | 'shellfish' | 'sesame';
+
+/** The Big 9 → canonical + common derivative terms. Built in full now; only
+ *  the groups the quiz captures today are wired below. */
+export const BIG9: Record<AllergenGroup, string[]> = {
+  milk: ['milk', 'butter', 'cheese', 'cream', 'whey', 'casein', 'ghee', 'yogurt', 'custard', 'buttermilk'],
+  egg: ['egg', 'eggs', 'albumin', 'mayonnaise', 'mayo', 'meringue'],
+  peanut: ['peanut', 'peanuts', 'groundnut', 'arachis', 'pb&j', 'pb &j'],
+  treenut: ['almond', 'cashew', 'walnut', 'pecan', 'hazelnut', 'pistachio', 'macadamia', 'pine nut', 'brazil nut'],
+  wheat: ['wheat', 'flour', 'semolina', 'gluten', 'bread', 'pasta', 'couscous', 'breadcrumb', 'tortilla', 'cracker'],
+  soy: ['soy', 'soya', 'edamame', 'tofu', 'miso', 'tempeh', 'soybean'],
+  fish: ['fish', 'salmon', 'tuna', 'cod', 'tilapia', 'anchovy', 'sardine', 'haddock'],
+  shellfish: ['shellfish', 'shrimp', 'prawn', 'crab', 'lobster', 'crayfish', 'crustacean', 'scallop', 'clam', 'mussel', 'oyster'],
+  sesame: ['sesame', 'tahini'],
+};
+
+/**
+ * Quiz dietary values → allergen groups they imply.
+ * TODO(phase-5): the Nourish quiz only collects nut-allergy / dairy-free /
+ * gluten-free today. Add egg / fish / shellfish / soy / sesame capture to the
+ * quiz so those groups (already in BIG9) can be enforced.
+ */
+const DIETARY_TO_GROUPS: Record<string, AllergenGroup[]> = {
+  'nut-allergy': ['peanut', 'treenut'],
+  'dairy-free': ['milk'],
+  'gluten-free': ['wheat'],
+};
+
+export interface AllergenWarning {
+  allergen: AllergenGroup;
+  matchedTerms: string[];
+  affectedItems: string[];
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Match `term` as a whole word/token in `text` (case-insensitive). */
+function tokenMatch(term: string, text: string): boolean {
+  return new RegExp(`\\b${escapeRegex(term)}\\b`, 'i').test(text);
+}
+
+/** Collect every (label, text) pair from a plan that should be scanned. */
+function planTexts(plan: NourishResponse): Array<{ label: string; text: string }> {
+  const out: Array<{ label: string; text: string }> = [];
+  for (const day of plan.weeklyPlan ?? []) {
+    for (const meal of ['breakfast', 'lunch', 'dinner'] as const) {
+      const m = day[meal];
+      if (!m) continue;
+      out.push({ label: `${day.day} ${meal} (${m.name})`, text: m.name });
+      if (meal === 'dinner' && Array.isArray((m as { steps?: string[] }).steps)) {
+        for (const step of (m as { steps?: string[] }).steps ?? []) {
+          out.push({ label: `${day.day} dinner steps`, text: step });
+        }
+      }
+    }
+  }
+  for (const item of plan.shoppingList ?? []) {
+    out.push({ label: `Shopping: ${item.item}`, text: item.item });
+  }
+  return out;
+}
+
+/**
+ * Scan a generated plan for any declared allergen. Returns one warning per
+ * triggered group, with the exact matched terms and the affected item labels.
+ */
+export function scanPlanForAllergens(
+  plan: NourishResponse,
+  declaredDietary: string[],
+): AllergenWarning[] {
+  const groups = new Set<AllergenGroup>();
+  for (const d of declaredDietary) {
+    for (const g of DIETARY_TO_GROUPS[d] ?? []) groups.add(g);
+  }
+  if (groups.size === 0) return [];
+
+  const texts = planTexts(plan);
+  const warnings: AllergenWarning[] = [];
+
+  for (const group of Array.from(groups)) {
+    const matchedTerms = new Set<string>();
+    const affectedItems = new Set<string>();
+    for (const term of BIG9[group]) {
+      for (const { label, text } of texts) {
+        if (tokenMatch(term, text)) {
+          matchedTerms.add(term);
+          affectedItems.add(label);
+        }
+      }
+    }
+    if (matchedTerms.size > 0) {
+      warnings.push({
+        allergen: group,
+        matchedTerms: Array.from(matchedTerms),
+        affectedItems: Array.from(affectedItems),
+      });
+    }
+  }
+  return warnings;
+}

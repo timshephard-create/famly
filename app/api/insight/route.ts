@@ -3,6 +3,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { insightInputSchema } from '@/lib/validations';
 import { validateRecommendation } from '@/lib/validate-ai-output';
 import { MODELS } from '@/config/models';
+import { getActor } from '@/lib/actor';
+import { logUsage } from '@/lib/usage-log';
+import { checkRateLimit, checkSpendCeiling, HIGH_DEMAND_MESSAGE } from '@/lib/spend-guard';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -51,6 +54,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // §4 protection: rate limit + spend ceiling before the paid call.
+    const actor = await getActor(request);
+    const rate = await checkRateLimit(actor.key);
+    if (!rate.allowed) {
+      return NextResponse.json({ error: HIGH_DEMAND_MESSAGE }, { status: 429 });
+    }
+    const ceiling = await checkSpendCeiling(tool);
+    if (!ceiling.allowed) {
+      // Graceful degrade — serve the static insight, flagged, no model call.
+      return NextResponse.json({
+        data: { insight: FALLBACK_INSIGHTS[tool] || FALLBACK_INSIGHTS.childcare, degraded: true },
+      });
+    }
+
     const message = await anthropic.messages.create({
       model: MODELS.sonnet,
       max_tokens: 500,
@@ -61,6 +78,8 @@ export async function POST(request: NextRequest) {
         },
       ],
     });
+    // Cost telemetry (non-blocking).
+    logUsage({ tool, model: MODELS.sonnet, usage: message.usage, userId: actor.userId, ipHash: actor.ipHash });
 
     const textBlock = message.content.find((b) => b.type === 'text');
     let insight = textBlock ? textBlock.text : FALLBACK_INSIGHTS[tool] || '';
