@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { MODELS } from '@/config/models';
+import { logUsage } from '@/lib/usage-log';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -125,6 +126,9 @@ export async function validateRecommendation(
         content: `${systemPrompt}\n\nUser inputs summary: ${userInputsSummary}\n\nContent to review:\n${rawOutput}`,
       }],
     });
+
+    // Cost telemetry for the validation pass (non-blocking).
+    logUsage({ tool: `${toolName}:validation`, model: VALIDATION_MODEL, usage: message.usage });
 
     const textBlock = message.content.find((b) => b.type === 'text');
     if (!textBlock) return defaultResult;

@@ -3,6 +3,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { brightwatchInputSchema } from '@/lib/validations';
 import { validateRecommendation } from '@/lib/validate-ai-output';
 import { MODELS } from '@/config/models';
+import { getActor } from '@/lib/actor';
+import { logUsage } from '@/lib/usage-log';
+import { checkRateLimit, checkSpendCeiling, HIGH_DEMAND_MESSAGE } from '@/lib/spend-guard';
 import type { BrightWatchResponse } from '@/types';
 
 const anthropic = new Anthropic({
@@ -89,6 +92,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ data: buildFallback(age, context, medium) });
     }
 
+    // §4 protection: rate limit + spend ceiling before the paid call.
+    const actor = await getActor(request);
+    const rate = await checkRateLimit(actor.key);
+    if (!rate.allowed) {
+      return NextResponse.json({ error: HIGH_DEMAND_MESSAGE }, { status: 429 });
+    }
+    const ceiling = await checkSpendCeiling('media');
+    if (!ceiling.allowed) {
+      return NextResponse.json({ data: { ...buildFallback(age, context, medium), degraded: true } });
+    }
+
     const prompt = `You are a child development media specialist. Analyze content for a child aged ${age} in a "${context}" context, looking at "${medium}" content.
 
 Return ONLY valid JSON (no markdown, no code fences) in this exact structure:
@@ -123,6 +137,7 @@ For each recommendation, if you have any uncertainty about whether this content 
       max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }],
     });
+    logUsage({ tool: 'media', model: MODELS.sonnet, usage: message.usage, userId: actor.userId, ipHash: actor.ipHash });
 
     const textBlock = message.content.find((b) => b.type === 'text');
     if (!textBlock) {
