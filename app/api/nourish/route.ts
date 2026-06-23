@@ -174,13 +174,22 @@ Requirements:
 
     const message = await anthropic.messages.create({
       model: MODELS.sonnet,
-      max_tokens: 3500,
+      // A full 7-day plan (dinner steps + tips, 15-20 shopping items, store
+      // strategy) runs ~4.5-6k output tokens. 3500 truncated it mid-JSON,
+      // so JSON.parse failed and we silently fell back. 8000 gives headroom.
+      max_tokens: 8000,
       messages: [{ role: 'user', content: prompt }],
     });
     logUsage({ tool: 'meal', model: MODELS.sonnet, usage: message.usage, userId: actor.userId, ipHash: actor.ipHash });
+    // "Green doesn't mean present": if the model still hit the cap, the JSON is
+    // truncated and we'll fall back — make that loud so it can't hide again.
+    if (message.stop_reason === 'max_tokens') {
+      console.error('[API /nourish] TRUNCATED: hit max_tokens cap — plan JSON incomplete, will fall back. output_tokens=', message.usage?.output_tokens);
+    }
 
     const textBlock = message.content.find((b) => b.type === 'text');
     if (!textBlock) {
+      console.error('[API /nourish] No text block in Claude response — serving fallback. stop_reason=', message.stop_reason);
       return NextResponse.json({ data: withAllergens(buildFallback(), dietary) });
     }
 
@@ -200,8 +209,13 @@ Requirements:
       }
 
       return NextResponse.json({ data: withAllergens(data, dietary) });
-    } catch {
-      console.error('[API /nourish] Failed to parse Claude response');
+    } catch (parseErr) {
+      console.error(
+        '[API /nourish] Failed to parse Claude response — serving fallback.',
+        'stop_reason=', message.stop_reason,
+        'output_tokens=', message.usage?.output_tokens,
+        'error=', parseErr instanceof Error ? parseErr.message : parseErr,
+      );
       return NextResponse.json({ data: withAllergens(buildFallback(), dietary) });
     }
   } catch (err) {

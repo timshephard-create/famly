@@ -10,7 +10,7 @@ import {
 } from './helpers';
 
 test.describe('Nourish', () => {
-  test.setTimeout(90000); // Nourish needs Claude + Places calls
+  test.setTimeout(130000); // full AI plan (~5k tokens, 8000 cap) is slower than the old truncated fallback; +headroom for 3-worker concurrency
 
   test('Profile 1 — Nut allergy family', async ({ page }) => {
     await page.goto('/nourish');
@@ -28,7 +28,7 @@ test.describe('Nourish', () => {
     await fillTextAndContinue(page, 'ZIP code', '76009');
 
     await dismissEmailCapture(page);
-    await waitForResults(page, 60000);
+    await waitForResults(page, 110000);
 
     await expect(page.locator('[data-testid="results-container"]')).toBeVisible();
     await expect(page.getByText('Monday', { exact: true })).toBeVisible();
@@ -47,7 +47,7 @@ test.describe('Nourish', () => {
     await fillTextAndContinue(page, 'ZIP code', '76009');
 
     await dismissEmailCapture(page);
-    await waitForResults(page, 60000);
+    await waitForResults(page, 110000);
 
     await expect(page.locator('[data-testid="results-container"]')).toBeVisible();
     await assertNoError(page);
@@ -64,7 +64,7 @@ test.describe('Nourish', () => {
     await fillTextAndContinue(page, 'ZIP code', '76009');
 
     await dismissEmailCapture(page);
-    await waitForResults(page, 60000);
+    await waitForResults(page, 110000);
 
     await expect(page.locator('[data-testid="results-container"]')).toBeVisible();
     await expect(page.getByText('Monday', { exact: true })).toBeVisible();
@@ -81,7 +81,7 @@ test.describe('Nourish', () => {
     await fillTextAndContinue(page, 'ZIP code', '76009');
 
     await dismissEmailCapture(page);
-    await waitForResults(page, 60000);
+    await waitForResults(page, 110000);
 
     await expect(page.locator('[data-testid="results-container"]')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Shopping List' })).toBeVisible();
