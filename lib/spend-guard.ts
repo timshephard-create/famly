@@ -79,5 +79,6 @@ export async function checkRateLimit(
   }
 }
 
-export const HIGH_DEMAND_MESSAGE =
-  "We're seeing high demand right now — please try again in a little while. Your info wasn't lost.";
+// Re-exported from the client-safe module so the API routes can keep importing
+// it from here while client components import it without server code leaking in.
+export { HIGH_DEMAND_MESSAGE } from './messages';

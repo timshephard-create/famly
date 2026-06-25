@@ -83,4 +83,35 @@ test.describe('BrightWatch', () => {
     await expect(page.locator('[data-testid="results-container"]')).toBeVisible();
     await expect(page.locator('[data-testid="disclaimer"]')).toBeVisible();
   });
+
+  test('Rate limit (429) shows the calm high-demand copy, not the generic error', async ({ page }) => {
+    // Force a real 429 with the body shape Phase 4A returns: `{ error }`, no `.data`.
+    // This is deterministic (no AI call), so it gives clean, repeatable proof that
+    // a rate-limited user gets the calm copy rather than "Oops — we hit a snag".
+    await page.route('**/api/brightwatch', (route) =>
+      route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error:
+            "We're seeing high demand right now — please try again in a little while. Your info wasn't lost.",
+        }),
+      }),
+    );
+
+    await page.goto('/bright-watch');
+    await page.waitForSelector('h2', { timeout: 10000 });
+
+    await selectAutoAdvance(page, 'How old is your child', '2–3 years');
+    await selectAutoAdvance(page, 'viewing context', 'Learning time');
+    await selectAutoAdvance(page, 'type of content', 'TV shows');
+
+    // Calm copy renders…
+    await expect(
+      page.getByRole('heading', { name: 'High demand right now' }),
+    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('please try again in a little while')).toBeVisible();
+    // …and the generic "Oops" error does NOT.
+    await expect(page.getByText('Oops')).not.toBeVisible();
+  });
 });

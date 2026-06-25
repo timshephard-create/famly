@@ -6,6 +6,7 @@ import QuizShell from '@/components/QuizShell';
 import EmailCapture from '@/components/EmailCapture';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
+import { postTool, RateLimitError } from '@/lib/tool-client';
 import BrightWatchCard from '@/components/BrightWatchCard';
 import AIInsightBlock from '@/components/AIInsightBlock';
 import CrossToolFooter from '@/components/CrossToolFooter';
@@ -58,39 +59,36 @@ export default function BrightWatchTool() {
   const [phase, setPhase] = useState<'quiz' | 'loading' | 'email' | 'results'>('quiz');
   const [results, setResults] = useState<BrightWatchResponse | null>(null);
   const [emailData, setEmailData] = useState<Record<string, unknown>>({});
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<{ message: string; calm: boolean } | null>(null);
 
   const handleComplete = useCallback(async (answers: Record<string, string | string[] | number>) => {
     setPhase('loading');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    setError(false);
+    setError(null);
 
     try {
-      const res = await fetch('/api/brightwatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          age: answers.age,
-          context: answers.context,
-          medium: answers.medium,
-        }),
+      const bwData = await postTool<BrightWatchResponse>('/api/brightwatch', {
+        age: answers.age,
+        context: answers.context,
+        medium: answers.medium,
       });
-
-      const data = await res.json();
-      const bwData = data.data as BrightWatchResponse;
       setResults(bwData);
       setEmailData({
         childAge: answers.age as string,
         context: answers.context as string,
-        recommendations: bwData?.recommendations?.map((r) => ({
+        recommendations: bwData.recommendations?.map((r) => ({
           name: r.name, platform: r.platform, score: r.score, why: r.why,
         })),
-        avoid: bwData?.avoid,
+        avoid: bwData.avoid,
       });
       setPhase('email');
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch {
-      setError(true);
+    } catch (err) {
+      setError(
+        err instanceof RateLimitError
+          ? { message: err.message, calm: true }
+          : { message: "We couldn't load your recommendations. Please try again.", calm: false },
+      );
       setPhase('results');
     }
   }, []);
@@ -165,7 +163,9 @@ export default function BrightWatchTool() {
     return (
       <div className="min-h-screen bg-cream">
         <ErrorState
-          message="We couldn't load your recommendations. Please try again."
+          title={error?.calm ? 'High demand right now' : undefined}
+          icon={error?.calm ? '\u{23F3}' : undefined}
+          message={error?.message ?? "We couldn't load your recommendations. Please try again."}
           onRetry={() => setPhase('quiz')}
         />
       </div>
