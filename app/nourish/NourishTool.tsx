@@ -6,7 +6,7 @@ import { trackEvent } from '@/lib/analytics';
 import QuizShell from '@/components/QuizShell';
 import EmailCapture from '@/components/EmailCapture';
 import ErrorState from '@/components/ErrorState';
-import LoadingState from '@/components/LoadingState';
+import NourishLoading from '@/components/NourishLoading';
 import AIInsightBlock from '@/components/AIInsightBlock';
 import CrossToolFooter from '@/components/CrossToolFooter';
 import RecommendationDisclaimer from '@/components/RecommendationDisclaimer';
@@ -192,12 +192,6 @@ function StoreSkeleton() {
   );
 }
 
-const NOURISH_LOADING_MESSAGES = [
-  'Planning your week...',
-  'Building your shopping list...',
-  'Finding stores near you...',
-  'Almost ready...',
-];
 
 function StoreCard({ store, shopUrl, searchItem }: { store: NearbyStore; shopUrl: string; searchItem: string }) {
   return (
@@ -363,7 +357,7 @@ export default function NourishTool() {
   if (phase === 'loading') {
     return (
       <div className="min-h-screen bg-cream">
-        <LoadingState color="terra" messages={NOURISH_LOADING_MESSAGES} />
+        <NourishLoading />
       </div>
     );
   }

@@ -63,3 +63,9 @@ html {
     text-wrap: balance;
   }
 }
+
+/* Indeterminate sweep for the Nourish loading progress bar. */
+@keyframes nourish-sweep {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(420%); }
+}
