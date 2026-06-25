@@ -6,6 +6,7 @@ import QuizShell from '@/components/QuizShell';
 import EmailCapture from '@/components/EmailCapture';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
+import { postTool, RateLimitError } from '@/lib/tool-client';
 import PlanCard from '@/components/PlanCard';
 import AIInsightBlock from '@/components/AIInsightBlock';
 import CrossToolFooter from '@/components/CrossToolFooter';
@@ -646,6 +647,7 @@ export default function HealthGuideTool() {
   const [realPlansLoading, setRealPlansLoading] = useState(true);
   const [insight, setInsight] = useState('');
   const [insightLoading, setInsightLoading] = useState(true);
+  const [insightNotice, setInsightNotice] = useState('');
   const [emailData, setEmailData] = useState<Record<string, unknown>>({});
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string | string[] | number>>({});
   const [error, setError] = useState(false);
@@ -700,19 +702,20 @@ export default function HealthGuideTool() {
         employerCoverage: profile.employerCoverage,
       });
 
-      // Fetch AI insight in background
+      // Fetch AI insight in background. Supplementary: the locally-computed
+      // recommendations stand on their own, so a rate-limited insight surfaces
+      // the calm high-demand note in its own slot rather than blocking results.
       setInsightLoading(true);
-      fetch('/api/insight', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tool: 'health', profile: answers }),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          setInsight(data.data?.insight || '');
+      setInsightNotice('');
+      postTool<{ insight: string }>('/api/insight', { tool: 'health', profile: answers })
+        .then((d) => {
+          setInsight(d.insight || '');
           setInsightLoading(false);
         })
-        .catch(() => setInsightLoading(false));
+        .catch((err) => {
+          if (err instanceof RateLimitError) setInsightNotice(err.message);
+          setInsightLoading(false);
+        });
 
       // Fetch CMS real plans + run decision engine.
       // costResult (which powers the cash-pay + HSA sections) ONLY comes from
@@ -838,6 +841,10 @@ export default function HealthGuideTool() {
         ) : insight ? (
           <div className="mb-8 transition-opacity duration-500">
             <AIInsightBlock insight={insight} color="sky" />
+          </div>
+        ) : insightNotice ? (
+          <div className="mb-8 rounded-2xl border border-line bg-shell px-5 py-4 text-sm text-mute">
+            {insightNotice}
           </div>
         ) : null}
 

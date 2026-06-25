@@ -6,6 +6,7 @@ import { trackEvent } from '@/lib/analytics';
 import QuizShell from '@/components/QuizShell';
 import EmailCapture from '@/components/EmailCapture';
 import ErrorState from '@/components/ErrorState';
+import { postTool, RateLimitError } from '@/lib/tool-client';
 import NourishLoading from '@/components/NourishLoading';
 import AIInsightBlock from '@/components/AIInsightBlock';
 import CrossToolFooter from '@/components/CrossToolFooter';
@@ -241,14 +242,14 @@ export default function NourishTool() {
   const [emailData, setEmailData] = useState<Record<string, unknown>>({});
   const [userBudget, setUserBudget] = useState(0);
   const [expandedDay, setExpandedDay] = useState(0);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<{ message: string; calm: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
   const [instacartState, setInstacartState] = useState<'idle' | 'loading' | 'unavailable'>('idle');
 
   const handleComplete = useCallback(async (answers: Record<string, string | string[] | number>) => {
     setPhase('loading');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    setError(false);
+    setError(null);
     setStoresLoading(true);
     const zip = answers.zip as string;
     setUserBudget(answers.budget as number);
@@ -271,21 +272,14 @@ export default function NourishTool() {
 
       const nearbyStoreNames = foundStores.map((s) => s.chain);
 
-      const nourishRes = await fetch('/api/nourish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          householdSize: answers.householdSize,
-          budget: answers.budget,
-          dietary: answers.dietary || [],
-          cookingTime: answers.cookingTime,
-          zip,
-          nearbyStores: nearbyStoreNames,
-        }),
+      const nourishData = await postTool<NourishResponse>('/api/nourish', {
+        householdSize: answers.householdSize,
+        budget: answers.budget,
+        dietary: answers.dietary || [],
+        cookingTime: answers.cookingTime,
+        zip,
+        nearbyStores: nearbyStoreNames,
       });
-
-      const data = await nourishRes.json();
-      const nourishData = data.data as NourishResponse;
       setResults(nourishData);
 
       const dinners = nourishData.weeklyPlan?.slice(0, 3).map((d) => d.dinner) || [];
@@ -297,8 +291,12 @@ export default function NourishTool() {
 
       setPhase('email');
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch {
-      setError(true);
+    } catch (err) {
+      setError(
+        err instanceof RateLimitError
+          ? { message: err.message, calm: true }
+          : { message: "We couldn't generate your meal plan. Please try again.", calm: false },
+      );
       setPhase('results');
     }
   }, []);
@@ -366,7 +364,9 @@ export default function NourishTool() {
     return (
       <div className="min-h-screen bg-cream">
         <ErrorState
-          message="We couldn't generate your meal plan. Please try again."
+          title={error?.calm ? 'High demand right now' : undefined}
+          icon={error?.calm ? '\u{23F3}' : undefined}
+          message={error?.message ?? "We couldn't generate your meal plan. Please try again."}
           onRetry={() => setPhase('quiz')}
         />
       </div>

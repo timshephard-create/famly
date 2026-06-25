@@ -6,6 +6,7 @@ import QuizShell from '@/components/QuizShell';
 import EmailCapture from '@/components/EmailCapture';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
+import { postTool, RateLimitError } from '@/lib/tool-client';
 import PlaceCard from '@/components/PlaceCard';
 import SavingsTiles from '@/components/SavingsTiles';
 import AIInsightBlock from '@/components/AIInsightBlock';
@@ -130,6 +131,7 @@ export default function SproutTool() {
     places: PlaceResult[];
     savings: SavingsBreakdown;
     insight: string;
+    insightNotice: string;
     isGapMode: boolean;
     fallback: boolean;
     emailData: Record<string, unknown>;
@@ -158,15 +160,18 @@ export default function SproutTool() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ zip, types: placeTypes }),
         }).then((r) => r.json()),
-        fetch('/api/insight', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tool: 'childcare', profile: answers }),
-        }).then((r) => r.json()),
+        postTool<{ insight: string }>('/api/insight', { tool: 'childcare', profile: answers }),
       ]);
 
       const placesData = placesRes.status === 'fulfilled' ? placesRes.value : { data: [], fallback: true };
-      const insightData = insightRes.status === 'fulfilled' ? insightRes.value : { data: { insight: '' } };
+      // Insight is supplementary: a rate-limited (or failed) insight never blocks
+      // the locally-computed places + savings. On a 429 we surface the calm
+      // high-demand note in the insight slot instead of silently dropping it.
+      const insight = insightRes.status === 'fulfilled' ? insightRes.value.insight || '' : '';
+      const insightNotice =
+        insightRes.status === 'rejected' && insightRes.reason instanceof RateLimitError
+          ? insightRes.reason.message
+          : '';
 
       let places: PlaceResult[] = placesData.data || [];
 
@@ -184,7 +189,8 @@ export default function SproutTool() {
       setResults({
         places,
         savings,
-        insight: insightData.data?.insight || '',
+        insight,
+        insightNotice,
         isGapMode,
         fallback: placesData.fallback || false,
         emailData: {
@@ -279,6 +285,11 @@ export default function SproutTool() {
         {results.insight && (
           <div className="mb-8">
             <AIInsightBlock insight={results.insight} color="sage" />
+          </div>
+        )}
+        {!results.insight && results.insightNotice && (
+          <div className="mb-8 rounded-2xl border border-line bg-shell px-5 py-4 text-sm text-mute">
+            {results.insightNotice}
           </div>
         )}
 
