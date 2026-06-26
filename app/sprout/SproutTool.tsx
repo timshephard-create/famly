@@ -6,7 +6,9 @@ import QuizShell from '@/components/QuizShell';
 import EmailCapture from '@/components/EmailCapture';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
+import LastResultCard from '@/components/LastResultCard';
 import { postTool, RateLimitError } from '@/lib/tool-client';
+import { useFamilyProfile } from '@/lib/useFamilyProfile';
 import PlaceCard from '@/components/PlaceCard';
 import SavingsTiles from '@/components/SavingsTiles';
 import AIInsightBlock from '@/components/AIInsightBlock';
@@ -125,18 +127,29 @@ const GAP_CARE_EXTRAS: PlaceResult[] = [
   },
 ];
 
+type SproutResults = {
+  places: PlaceResult[];
+  savings: SavingsBreakdown;
+  insight: string;
+  insightNotice: string;
+  isGapMode: boolean;
+  fallback: boolean;
+  emailData: Record<string, unknown>;
+};
+
 export default function SproutTool() {
   const [phase, setPhase] = useState<'quiz' | 'loading' | 'email' | 'results'>('quiz');
-  const [results, setResults] = useState<{
-    places: PlaceResult[];
-    savings: SavingsBreakdown;
-    insight: string;
-    insightNotice: string;
-    isGapMode: boolean;
-    fallback: boolean;
-    emailData: Record<string, unknown>;
-  } | null>(null);
+  const [results, setResults] = useState<SproutResults | null>(null);
   const [error, setError] = useState(false);
+  const { ready, initialAnswers, lastResult, saveProfileFromAnswers, saveResult, clearRecall } =
+    useFamilyProfile<SproutResults>(tool.id);
+
+  const handleRecall = useCallback(() => {
+    if (!lastResult) return;
+    setResults(lastResult);
+    setPhase('results');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [lastResult]);
 
   const handleComplete = useCallback(async (answers: Record<string, string | string[] | number>) => {
     setPhase('loading');
@@ -184,9 +197,11 @@ export default function SproutTool() {
         places = [HEAD_START_CARD, ...places];
       }
 
+      // Eligibility math runs off the freshly-entered quiz answer (`income`),
+      // never the profile's stored income — see the guard in lib/profile.ts.
       const savings = calculateSavings(income);
 
-      setResults({
+      const snapshot: SproutResults = {
         places,
         savings,
         insight,
@@ -201,7 +216,10 @@ export default function SproutTool() {
           income,
           isGapMode,
         },
-      });
+      };
+      setResults(snapshot);
+      saveProfileFromAnswers(answers);
+      saveResult(snapshot);
 
       setPhase('email');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -209,7 +227,7 @@ export default function SproutTool() {
       setError(true);
       setPhase('results');
     }
-  }, []);
+  }, [saveProfileFromAnswers, saveResult]);
 
   if (phase === 'quiz') {
     return (
@@ -219,12 +237,18 @@ export default function SproutTool() {
           <h1 className="mt-2 font-display text-3xl font-bold text-charcoal">{tool.name}</h1>
           <p className="mt-1 text-sm text-mid">{tool.badge} Navigator</p>
         </div>
-        <QuizShell
-          toolColor={tool.color}
-          toolId={tool.id}
-          questions={questions}
-          onComplete={handleComplete}
-        />
+        {lastResult && (
+          <LastResultCard toolName={tool.name} onView={handleRecall} onDismiss={clearRecall} />
+        )}
+        {ready && (
+          <QuizShell
+            toolColor={tool.color}
+            toolId={tool.id}
+            questions={questions}
+            onComplete={handleComplete}
+            initialAnswers={initialAnswers}
+          />
+        )}
       </div>
     );
   }

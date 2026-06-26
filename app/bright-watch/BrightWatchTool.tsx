@@ -6,7 +6,9 @@ import QuizShell from '@/components/QuizShell';
 import EmailCapture from '@/components/EmailCapture';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
+import LastResultCard from '@/components/LastResultCard';
 import { postTool, RateLimitError } from '@/lib/tool-client';
+import { useFamilyProfile } from '@/lib/useFamilyProfile';
 import BrightWatchCard from '@/components/BrightWatchCard';
 import AIInsightBlock from '@/components/AIInsightBlock';
 import CrossToolFooter from '@/components/CrossToolFooter';
@@ -60,6 +62,15 @@ export default function BrightWatchTool() {
   const [results, setResults] = useState<BrightWatchResponse | null>(null);
   const [emailData, setEmailData] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<{ message: string; calm: boolean } | null>(null);
+  const { ready, initialAnswers, lastResult, saveProfileFromAnswers, saveResult, clearRecall } =
+    useFamilyProfile<BrightWatchResponse>(tool.id);
+
+  const handleRecall = useCallback(() => {
+    if (!lastResult) return;
+    setResults(lastResult);
+    setPhase('results');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [lastResult]);
 
   const handleComplete = useCallback(async (answers: Record<string, string | string[] | number>) => {
     setPhase('loading');
@@ -73,6 +84,8 @@ export default function BrightWatchTool() {
         medium: answers.medium,
       });
       setResults(bwData);
+      saveProfileFromAnswers(answers);
+      saveResult(bwData);
       setEmailData({
         childAge: answers.age as string,
         context: answers.context as string,
@@ -91,7 +104,7 @@ export default function BrightWatchTool() {
       );
       setPhase('results');
     }
-  }, []);
+  }, [saveProfileFromAnswers, saveResult]);
 
   if (phase === 'quiz') {
     return (
@@ -134,12 +147,18 @@ export default function BrightWatchTool() {
           </p>
         </div>
 
-        <QuizShell
-          toolColor={tool.color}
-          toolId={tool.id}
-          questions={questions}
-          onComplete={handleComplete}
-        />
+        {lastResult && (
+          <LastResultCard toolName={tool.name} onView={handleRecall} onDismiss={clearRecall} />
+        )}
+        {ready && (
+          <QuizShell
+            toolColor={tool.color}
+            toolId={tool.id}
+            questions={questions}
+            onComplete={handleComplete}
+            initialAnswers={initialAnswers}
+          />
+        )}
       </div>
     );
   }

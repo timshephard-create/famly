@@ -40,6 +40,37 @@ const DIETARY_TO_GROUPS: Record<string, AllergenGroup[]> = {
   'gluten-free': ['wheat'],
 };
 
+/**
+ * Edge mappers between Nourish's quiz option values and the canonical Big-9
+ * groups stored on the family profile. Built off DIETARY_TO_GROUPS so Item 4
+ * (full nine-group quiz) extends them by adding map entries only — no logic
+ * change here, and scanPlanForAllergens stays untouched.
+ */
+
+/** Quiz dietary option values → canonical groups (deduped). */
+export function dietaryValuesToGroups(values: string[]): AllergenGroup[] {
+  const set = new Set<AllergenGroup>();
+  for (const v of values) {
+    for (const g of DIETARY_TO_GROUPS[v] ?? []) set.add(g);
+  }
+  return Array.from(set);
+}
+
+/**
+ * Canonical groups → quiz dietary option values. A value is emitted only when
+ * ALL of its mapped groups are present, which makes the round-trip lossless:
+ * e.g. 'nut-allergy' requires both peanut AND treenut (exactly what
+ * dietaryValuesToGroups stores for it).
+ */
+export function groupsToDietaryValues(groups: AllergenGroup[]): string[] {
+  const have = new Set<AllergenGroup>(groups);
+  const out: string[] = [];
+  for (const [value, gs] of Object.entries(DIETARY_TO_GROUPS)) {
+    if (gs.length > 0 && gs.every((g) => have.has(g))) out.push(value);
+  }
+  return out;
+}
+
 export interface AllergenWarning {
   allergen: AllergenGroup;
   matchedTerms: string[];

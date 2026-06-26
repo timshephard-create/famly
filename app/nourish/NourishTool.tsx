@@ -6,7 +6,9 @@ import { trackEvent } from '@/lib/analytics';
 import QuizShell from '@/components/QuizShell';
 import EmailCapture from '@/components/EmailCapture';
 import ErrorState from '@/components/ErrorState';
+import LastResultCard from '@/components/LastResultCard';
 import { postTool, RateLimitError } from '@/lib/tool-client';
+import { useFamilyProfile } from '@/lib/useFamilyProfile';
 import NourishLoading from '@/components/NourishLoading';
 import AIInsightBlock from '@/components/AIInsightBlock';
 import CrossToolFooter from '@/components/CrossToolFooter';
@@ -245,6 +247,16 @@ export default function NourishTool() {
   const [error, setError] = useState<{ message: string; calm: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
   const [instacartState, setInstacartState] = useState<'idle' | 'loading' | 'unavailable'>('idle');
+  const { ready, initialAnswers, lastResult, saveProfileFromAnswers, saveResult, clearRecall } =
+    useFamilyProfile<NourishResponse>(tool.id);
+
+  const handleRecall = useCallback(() => {
+    if (!lastResult) return;
+    setResults(lastResult);
+    setUserBudget(parseFloat(lastResult.weeklyTotal?.replace(/[^0-9.]/g, '') || '0'));
+    setPhase('results');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [lastResult]);
 
   const handleComplete = useCallback(async (answers: Record<string, string | string[] | number>) => {
     setPhase('loading');
@@ -281,6 +293,8 @@ export default function NourishTool() {
         nearbyStores: nearbyStoreNames,
       });
       setResults(nourishData);
+      saveProfileFromAnswers(answers);
+      saveResult(nourishData);
 
       const dinners = nourishData.weeklyPlan?.slice(0, 3).map((d) => d.dinner) || [];
       setEmailData({
@@ -299,7 +313,7 @@ export default function NourishTool() {
       );
       setPhase('results');
     }
-  }, []);
+  }, [saveProfileFromAnswers, saveResult]);
 
   const handleCopyList = useCallback(() => {
     if (!results) return;
@@ -342,12 +356,18 @@ export default function NourishTool() {
           <h1 className="mt-2 font-display text-3xl font-bold text-charcoal">{tool.name}</h1>
           <p className="mt-1 text-sm text-mid">{tool.badge} Navigator</p>
         </div>
-        <QuizShell
-          toolColor={tool.color}
-          toolId={tool.id}
-          questions={questions}
-          onComplete={handleComplete}
-        />
+        {lastResult && (
+          <LastResultCard toolName={tool.name} onView={handleRecall} onDismiss={clearRecall} />
+        )}
+        {ready && (
+          <QuizShell
+            toolColor={tool.color}
+            toolId={tool.id}
+            questions={questions}
+            onComplete={handleComplete}
+            initialAnswers={initialAnswers}
+          />
+        )}
       </div>
     );
   }

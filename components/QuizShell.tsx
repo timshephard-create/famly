@@ -12,6 +12,11 @@ interface QuizShellProps {
   toolId?: string;
   questions: QuizQuestion[];
   onComplete: (answers: Record<string, string | string[] | number>) => void;
+  /**
+   * Pre-filled answers for signed-in users (Phase 5 family profile). Seeds the
+   * quiz state on mount; anonymous users pass nothing and get the blank flow.
+   */
+  initialAnswers?: Record<string, string | string[] | number>;
 }
 
 const colorClasses: Record<string, { button: string; progress: string }> = {
@@ -21,9 +26,9 @@ const colorClasses: Record<string, { button: string; progress: string }> = {
   terra: { button: 'bg-terra hover:bg-terra-light', progress: 'bg-terra' },
 };
 
-export default function QuizShell({ toolColor, toolId, questions, onComplete }: QuizShellProps) {
+export default function QuizShell({ toolColor, toolId, questions, onComplete, initialAnswers }: QuizShellProps) {
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string | string[] | number>>({});
+  const [answers, setAnswers] = useState<Record<string, string | string[] | number>>(initialAnswers ?? {});
   const [direction, setDirection] = useState(1);
   const colors = colorClasses[toolColor] || colorClasses.sage;
   const quizCardRef = useRef<HTMLDivElement>(null);
