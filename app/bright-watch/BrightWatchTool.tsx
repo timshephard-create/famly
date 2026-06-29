@@ -7,6 +7,7 @@ import EmailCapture from '@/components/EmailCapture';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
 import LastResultCard from '@/components/LastResultCard';
+import SaveAccountNudge from '@/components/SaveAccountNudge';
 import { postTool, RateLimitError } from '@/lib/tool-client';
 import { useFamilyProfile } from '@/lib/useFamilyProfile';
 import BrightWatchCard from '@/components/BrightWatchCard';
@@ -62,7 +63,7 @@ export default function BrightWatchTool() {
   const [results, setResults] = useState<BrightWatchResponse | null>(null);
   const [emailData, setEmailData] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<{ message: string; calm: boolean } | null>(null);
-  const { ready, initialAnswers, lastResult, saveProfileFromAnswers, saveResult, clearRecall } =
+  const { ready, initialAnswers, lastResult, signedIn, saveProfileFromAnswers, saveResult, clearRecall } =
     useFamilyProfile<BrightWatchResponse>(tool.id);
 
   const handleRecall = useCallback(() => {
@@ -258,6 +259,7 @@ export default function BrightWatchTool() {
         <PremiumWaitlistCard toolId={tool.id} />
 
         <RecommendationDisclaimer tool="brightwatch" />
+        <SaveAccountNudge signedIn={signedIn} />
         <CrossToolFooter currentToolId={tool.id} />
       </div>
     </div>
