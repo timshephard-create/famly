@@ -76,6 +76,13 @@ export function dietaryValuesToGroups(values: string[]): AllergenGroup[] {
  * We therefore preserve the stored shape exactly (no widen-healing): the save
  * direction just reflects the user's current selection, which is idempotent for
  * every reachable state.
+ *
+ * INVARIANT: the "any present" rule is correct ONLY because 'nut-allergy' is
+ * currently the SOLE multi-group dietary value (every other option maps 1:1,
+ * where any-present and all-present are identical). If you add another combined
+ * option (more than one group), revisit this collapse logic — "any present"
+ * would then emit that option whenever a single one of its groups is stored,
+ * which may not be the intended display.
  */
 export function groupsToDietaryValues(groups: AllergenGroup[]): string[] {
   const have = new Set<AllergenGroup>(groups);
