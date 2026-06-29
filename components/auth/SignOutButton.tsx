@@ -12,7 +12,7 @@ export default function SignOutButton() {
         await supabase.auth.signOut();
         router.refresh();
       }}
-      className="rounded-xl border border-sage px-5 py-2.5 text-sm font-semibold text-sage transition-colors hover:bg-sage-pale"
+      className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-mute transition-colors hover:bg-shell hover:text-ink"
       data-testid="signout"
     >
       Sign out
