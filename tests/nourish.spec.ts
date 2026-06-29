@@ -87,4 +87,21 @@ test.describe('Nourish', () => {
     await expect(page.getByRole('heading', { name: 'Shopping List' })).toBeVisible();
     await assertNoError(page);
   });
+
+  test('Allergen quiz offers all nine Big-9 groups', async ({ page }) => {
+    // No AI call — stops at the dietary question and asserts the options render.
+    await page.goto('/nourish');
+    await page.waitForSelector('h2', { timeout: 10000 });
+    await selectAutoAdvance(page, 'How many people', 'Family of 3');
+    await setSliderAndContinue(page, 'weekly grocery budget', 150);
+
+    await page.waitForSelector('h2:has-text("dietary")', { timeout: 10000 });
+    const labels = [
+      'Gluten-free', 'Dairy-free', 'Nut allergy', // the original three
+      'Egg allergy', 'Soy allergy', 'Fish allergy', 'Shellfish allergy', 'Sesame allergy', // the five added
+    ];
+    for (const label of labels) {
+      await expect(page.getByText(label, { exact: true })).toBeVisible();
+    }
+  });
 });

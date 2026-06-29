@@ -62,6 +62,11 @@ const questions: QuizQuestion[] = [
       { value: 'kosher', label: 'Kosher' },
       { value: 'low-carb', label: 'Low-carb / Keto' },
       { value: 'nut-allergy', label: 'Nut allergy' },
+      { value: 'egg', label: 'Egg allergy' },
+      { value: 'soy', label: 'Soy allergy' },
+      { value: 'fish', label: 'Fish allergy' },
+      { value: 'shellfish', label: 'Shellfish allergy' },
+      { value: 'sesame', label: 'Sesame allergy' },
     ],
   },
   {

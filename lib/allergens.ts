@@ -29,15 +29,22 @@ export const BIG9: Record<AllergenGroup, string[]> = {
 };
 
 /**
- * Quiz dietary values → allergen groups they imply.
- * TODO(phase-5): the Nourish quiz only collects nut-allergy / dairy-free /
- * gluten-free today. Add egg / fish / shellfish / soy / sesame capture to the
- * quiz so those groups (already in BIG9) can be enforced.
+ * Quiz dietary option values → canonical Big-9 groups. THE single source map
+ * for both the deterministic safety scan (scanPlanForAllergens) and family-
+ * profile storage; the edge mappers below are built generically off it, so
+ * adding a group is a one-line entry with no per-group special-casing.
+ * 'nut-allergy' is the one combined option (peanut + treenut); the other seven
+ * groups are 1:1. All nine groups are wired (Phase 5, Item 4).
  */
 const DIETARY_TO_GROUPS: Record<string, AllergenGroup[]> = {
   'nut-allergy': ['peanut', 'treenut'],
   'dairy-free': ['milk'],
   'gluten-free': ['wheat'],
+  egg: ['egg'],
+  soy: ['soy'],
+  fish: ['fish'],
+  shellfish: ['shellfish'],
+  sesame: ['sesame'],
 };
 
 /**
@@ -57,16 +64,31 @@ export function dietaryValuesToGroups(values: string[]): AllergenGroup[] {
 }
 
 /**
- * Canonical groups → quiz dietary option values. A value is emitted only when
- * ALL of its mapped groups are present, which makes the round-trip lossless:
- * e.g. 'nut-allergy' requires both peanut AND treenut (exactly what
- * dietaryValuesToGroups stores for it).
+ * Canonical groups → quiz dietary option values, for pre-fill DISPLAY only.
+ * A value is emitted when ANY of its mapped groups is present, so a stored
+ * profile is always shown faithfully — including the (normally unreachable)
+ * partial nut case: peanut OR treenut alone still shows 'nut-allergy' selected,
+ * so an allergen is never hidden from the user.
+ *
+ * Display-only — this never mutates the store. The Nourish quiz is the sole
+ * writer of profile allergens and only ever writes the nut pair together
+ * (nut-allergy -> [peanut, treenut]), so a partial cannot arise in normal use.
+ * We therefore preserve the stored shape exactly (no widen-healing): the save
+ * direction just reflects the user's current selection, which is idempotent for
+ * every reachable state.
+ *
+ * INVARIANT: the "any present" rule is correct ONLY because 'nut-allergy' is
+ * currently the SOLE multi-group dietary value (every other option maps 1:1,
+ * where any-present and all-present are identical). If you add another combined
+ * option (more than one group), revisit this collapse logic — "any present"
+ * would then emit that option whenever a single one of its groups is stored,
+ * which may not be the intended display.
  */
 export function groupsToDietaryValues(groups: AllergenGroup[]): string[] {
   const have = new Set<AllergenGroup>(groups);
   const out: string[] = [];
   for (const [value, gs] of Object.entries(DIETARY_TO_GROUPS)) {
-    if (gs.length > 0 && gs.every((g) => have.has(g))) out.push(value);
+    if (gs.some((g) => have.has(g))) out.push(value);
   }
   return out;
 }

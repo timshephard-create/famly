@@ -3,27 +3,64 @@ import {
   scanPlanForAllergens,
   dietaryValuesToGroups,
   groupsToDietaryValues,
+  type AllergenGroup,
 } from '@/lib/allergens';
 import type { NourishResponse, NourishShoppingItem } from '@/types';
 
 const sorted = (a: string[]) => [...a].sort();
 
-describe('allergen canonical edge-mappers (profile storage)', () => {
-  it('quiz values → canonical groups (nut-allergy expands to peanut + treenut)', () => {
+describe('allergen canonical edge-mappers — all nine groups (Item 4)', () => {
+  // The canonical Big-9 and the quiz allergen options that cover them
+  // (nut-allergy is the one combined option → peanut + treenut).
+  const ALL_GROUPS: AllergenGroup[] =
+    ['milk', 'egg', 'peanut', 'treenut', 'wheat', 'soy', 'fish', 'shellfish', 'sesame'];
+  const ALL_OPTIONS =
+    ['dairy-free', 'egg', 'nut-allergy', 'gluten-free', 'soy', 'fish', 'shellfish', 'sesame'];
+
+  it('maps every quiz allergen option to its canonical group(s)', () => {
     expect(sorted(dietaryValuesToGroups(['nut-allergy']))).toEqual(['peanut', 'treenut']);
-    expect(sorted(dietaryValuesToGroups(['dairy-free', 'gluten-free']))).toEqual(['milk', 'wheat']);
-    // Non-allergen dietary prefs (vegan etc.) contribute no groups.
-    expect(dietaryValuesToGroups(['vegan', 'none'])).toEqual([]);
+    expect(dietaryValuesToGroups(['dairy-free'])).toEqual(['milk']);
+    expect(dietaryValuesToGroups(['gluten-free'])).toEqual(['wheat']);
+    expect(dietaryValuesToGroups(['egg'])).toEqual(['egg']);
+    expect(dietaryValuesToGroups(['soy'])).toEqual(['soy']);
+    expect(dietaryValuesToGroups(['fish'])).toEqual(['fish']);
+    expect(dietaryValuesToGroups(['shellfish'])).toEqual(['shellfish']);
+    expect(dietaryValuesToGroups(['sesame'])).toEqual(['sesame']);
+    // Non-allergen dietary prefs contribute no groups.
+    expect(dietaryValuesToGroups(['vegan', 'none', 'halal'])).toEqual([]);
   });
 
-  it('canonical groups → quiz values, losslessly round-tripping nut-allergy both ways', () => {
-    const groups = dietaryValuesToGroups(['nut-allergy', 'dairy-free']);
-    expect(sorted(groupsToDietaryValues(groups))).toEqual(['dairy-free', 'nut-allergy']);
+  it('round-trips all nine groups: options → groups → options', () => {
+    expect(sorted(groupsToDietaryValues(dietaryValuesToGroups(ALL_OPTIONS)))).toEqual(sorted(ALL_OPTIONS));
   });
 
-  it('emits nut-allergy only when BOTH peanut and treenut are present', () => {
-    expect(groupsToDietaryValues(['peanut'])).toEqual([]); // partial → not collapsed
+  it('round-trips all nine groups: groups → options → groups', () => {
+    expect(sorted(dietaryValuesToGroups(groupsToDietaryValues(ALL_GROUPS)))).toEqual(sorted(ALL_GROUPS));
+  });
+
+  it('nut expand: selecting nut-allergy stores BOTH peanut and treenut', () => {
+    expect(sorted(dietaryValuesToGroups(['nut-allergy']))).toEqual(['peanut', 'treenut']);
+  });
+
+  it('nut collapse: a stored peanut + treenut pair shows nut-allergy', () => {
     expect(groupsToDietaryValues(['peanut', 'treenut'])).toEqual(['nut-allergy']);
+  });
+
+  // Partial-nut decision (Item 4): the Nourish quiz is the SOLE writer of profile
+  // allergens and only ever writes the nut pair together, so a peanut-XOR-treenut
+  // store is unreachable in normal use. For DISPLAY we collapse a partial to
+  // 'nut-allergy' so the allergen is never hidden from the user; we do NOT
+  // widen-heal the store (preserve-exact — the save just reflects the user's
+  // current selection, which is idempotent for every reachable state).
+  it('partial nut store collapses to nut-allergy for display (never hidden)', () => {
+    expect(groupsToDietaryValues(['peanut'])).toEqual(['nut-allergy']);
+    expect(groupsToDietaryValues(['treenut'])).toEqual(['nut-allergy']);
+  });
+
+  it('a partial mixed store still surfaces every allergen', () => {
+    expect(sorted(groupsToDietaryValues(['peanut', 'milk', 'sesame']))).toEqual(
+      ['dairy-free', 'nut-allergy', 'sesame'],
+    );
   });
 });
 
