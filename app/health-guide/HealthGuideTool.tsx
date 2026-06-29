@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { TOOLS } from '@/config/platform';
 import QuizShell from '@/components/QuizShell';
 import EmailCapture from '@/components/EmailCapture';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
+import LastResultCard from '@/components/LastResultCard';
 import { postTool, RateLimitError } from '@/lib/tool-client';
+import { useFamilyProfile } from '@/lib/useFamilyProfile';
 import PlanCard from '@/components/PlanCard';
 import AIInsightBlock from '@/components/AIInsightBlock';
 import CrossToolFooter from '@/components/CrossToolFooter';
@@ -639,6 +641,17 @@ function HSAGuide({ hsaAnalysis }: { hsaAnalysis: HealthCostResult['hsaAnalysis'
 // MAIN COMPONENT
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+// HealthGuide's result is spread across several states; the recall snapshot
+// bundles them (persisted progressively as the async fetches settle).
+type HealthSnapshot = {
+  plans: PlanRecommendation[];
+  realPlans: CMSPlanResult[];
+  costResult: HealthCostResult | null;
+  insight: string;
+  emailData: Record<string, unknown>;
+  quizAnswers: Record<string, string | string[] | number>;
+};
+
 export default function HealthGuideTool() {
   const [phase, setPhase] = useState<'quiz' | 'loading' | 'email' | 'results'>('quiz');
   const [plans, setPlans] = useState<PlanRecommendation[]>([]);
@@ -651,6 +664,26 @@ export default function HealthGuideTool() {
   const [emailData, setEmailData] = useState<Record<string, unknown>>({});
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string | string[] | number>>({});
   const [error, setError] = useState(false);
+  const { ready, initialAnswers, lastResult, saveProfileFromAnswers, saveResult, clearRecall } =
+    useFamilyProfile<HealthSnapshot>(tool.id);
+  const snapshotRef = useRef<HealthSnapshot | null>(null);
+
+  const handleRecall = useCallback(() => {
+    const snap = lastResult;
+    if (!snap) return;
+    setPlans(snap.plans);
+    setRealPlans(snap.realPlans);
+    setCostResult(snap.costResult);
+    setInsight(snap.insight);
+    setEmailData(snap.emailData);
+    setQuizAnswers(snap.quizAnswers);
+    setInsightLoading(false);
+    setRealPlansLoading(false);
+    setInsightNotice('');
+    setError(false);
+    setPhase('results');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [lastResult]);
 
   const handleComplete = useCallback(async (answers: Record<string, string | string[] | number>) => {
     setPhase('loading');
@@ -695,12 +728,28 @@ export default function HealthGuideTool() {
       setPlans(recommendations);
 
       const topPlan = recommendations[0];
-      setEmailData({
+      const emailDataObj = {
         topPlanName: topPlan?.name,
         topPlanWhy: topPlan?.why,
         topWatchOut: topPlan?.watchOut?.[0],
         employerCoverage: profile.employerCoverage,
-      });
+      };
+      setEmailData(emailDataObj);
+
+      // Seed the recall snapshot with the synchronous core; the async fetches
+      // below refine it. Upsert overwrites, so each saveResult persists the
+      // most complete copy so far. saveProfileFromAnswers persists zip /
+      // household size / income (pre-fill convenience only — never eligibility).
+      snapshotRef.current = {
+        plans: recommendations,
+        realPlans: [],
+        costResult: null,
+        insight: '',
+        emailData: emailDataObj,
+        quizAnswers: answers,
+      };
+      saveProfileFromAnswers(answers);
+      saveResult(snapshotRef.current);
 
       // Fetch AI insight in background. Supplementary: the locally-computed
       // recommendations stand on their own, so a rate-limited insight surfaces
@@ -711,6 +760,10 @@ export default function HealthGuideTool() {
         .then((d) => {
           setInsight(d.insight || '');
           setInsightLoading(false);
+          if (snapshotRef.current) {
+            snapshotRef.current = { ...snapshotRef.current, insight: d.insight || '' };
+            saveResult(snapshotRef.current);
+          }
         })
         .catch((err) => {
           if (err instanceof RateLimitError) setInsightNotice(err.message);
@@ -740,11 +793,16 @@ export default function HealthGuideTool() {
           .then((data) => {
             const fetchedPlans = (data.data || []) as CMSPlanResult[];
             setRealPlans(fetchedPlans);
+            let result: HealthCostResult | null = null;
             if (fetchedPlans.length >= 1) {
-              const result = calculateHealthCosts(fetchedPlans, healthInputs);
+              result = calculateHealthCosts(fetchedPlans, healthInputs);
               setCostResult(result);
             }
             setRealPlansLoading(false);
+            if (snapshotRef.current) {
+              snapshotRef.current = { ...snapshotRef.current, realPlans: fetchedPlans, costResult: result };
+              saveResult(snapshotRef.current);
+            }
           })
           .catch(() => setRealPlansLoading(false));
       } else {
@@ -757,7 +815,7 @@ export default function HealthGuideTool() {
       setError(true);
       setPhase('results');
     }
-  }, []);
+  }, [saveProfileFromAnswers, saveResult]);
 
   if (phase === 'quiz') {
     return (
@@ -767,7 +825,18 @@ export default function HealthGuideTool() {
           <h1 className="mt-2 font-display text-3xl font-bold text-charcoal">{tool.name}</h1>
           <p className="mt-1 text-sm text-mid">{tool.badge} Navigator</p>
         </div>
-        <QuizShell toolColor={tool.color} toolId={tool.id} questions={questions} onComplete={handleComplete} />
+        {lastResult && (
+          <LastResultCard toolName={tool.name} onView={handleRecall} onDismiss={clearRecall} />
+        )}
+        {ready && (
+          <QuizShell
+            toolColor={tool.color}
+            toolId={tool.id}
+            questions={questions}
+            onComplete={handleComplete}
+            initialAnswers={initialAnswers}
+          />
+        )}
       </div>
     );
   }

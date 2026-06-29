@@ -1,6 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { scanPlanForAllergens } from '@/lib/allergens';
+import {
+  scanPlanForAllergens,
+  dietaryValuesToGroups,
+  groupsToDietaryValues,
+} from '@/lib/allergens';
 import type { NourishResponse, NourishShoppingItem } from '@/types';
+
+const sorted = (a: string[]) => [...a].sort();
+
+describe('allergen canonical edge-mappers (profile storage)', () => {
+  it('quiz values → canonical groups (nut-allergy expands to peanut + treenut)', () => {
+    expect(sorted(dietaryValuesToGroups(['nut-allergy']))).toEqual(['peanut', 'treenut']);
+    expect(sorted(dietaryValuesToGroups(['dairy-free', 'gluten-free']))).toEqual(['milk', 'wheat']);
+    // Non-allergen dietary prefs (vegan etc.) contribute no groups.
+    expect(dietaryValuesToGroups(['vegan', 'none'])).toEqual([]);
+  });
+
+  it('canonical groups → quiz values, losslessly round-tripping nut-allergy both ways', () => {
+    const groups = dietaryValuesToGroups(['nut-allergy', 'dairy-free']);
+    expect(sorted(groupsToDietaryValues(groups))).toEqual(['dairy-free', 'nut-allergy']);
+  });
+
+  it('emits nut-allergy only when BOTH peanut and treenut are present', () => {
+    expect(groupsToDietaryValues(['peanut'])).toEqual([]); // partial → not collapsed
+    expect(groupsToDietaryValues(['peanut', 'treenut'])).toEqual(['nut-allergy']);
+  });
+});
 
 const meal = (name: string, steps?: string[]) => ({ name, prepTime: '10 min', cost: '$2', steps });
 
