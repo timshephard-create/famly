@@ -7,6 +7,7 @@ import EmailCapture from '@/components/EmailCapture';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
 import LastResultCard from '@/components/LastResultCard';
+import SaveAccountNudge from '@/components/SaveAccountNudge';
 import { postTool, RateLimitError } from '@/lib/tool-client';
 import { useFamilyProfile } from '@/lib/useFamilyProfile';
 import PlaceCard from '@/components/PlaceCard';
@@ -141,7 +142,7 @@ export default function SproutTool() {
   const [phase, setPhase] = useState<'quiz' | 'loading' | 'email' | 'results'>('quiz');
   const [results, setResults] = useState<SproutResults | null>(null);
   const [error, setError] = useState(false);
-  const { ready, initialAnswers, lastResult, saveProfileFromAnswers, saveResult, clearRecall } =
+  const { ready, initialAnswers, lastResult, signedIn, saveProfileFromAnswers, saveResult, clearRecall } =
     useFamilyProfile<SproutResults>(tool.id);
 
   const handleRecall = useCallback(() => {
@@ -408,9 +409,9 @@ export default function SproutTool() {
           </div>
         </section>
 
-        <PremiumWaitlistCard toolId={tool.id} />
-
         <RecommendationDisclaimer tool="sprout" />
+        <SaveAccountNudge signedIn={signedIn} />
+        <PremiumWaitlistCard toolId={tool.id} />
         <CrossToolFooter currentToolId={tool.id} />
       </div>
     </div>

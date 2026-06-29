@@ -7,6 +7,7 @@ import QuizShell from '@/components/QuizShell';
 import EmailCapture from '@/components/EmailCapture';
 import ErrorState from '@/components/ErrorState';
 import LastResultCard from '@/components/LastResultCard';
+import SaveAccountNudge from '@/components/SaveAccountNudge';
 import { postTool, RateLimitError } from '@/lib/tool-client';
 import { useFamilyProfile } from '@/lib/useFamilyProfile';
 import NourishLoading from '@/components/NourishLoading';
@@ -252,7 +253,7 @@ export default function NourishTool() {
   const [error, setError] = useState<{ message: string; calm: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
   const [instacartState, setInstacartState] = useState<'idle' | 'loading' | 'unavailable'>('idle');
-  const { ready, initialAnswers, lastResult, saveProfileFromAnswers, saveResult, clearRecall } =
+  const { ready, initialAnswers, lastResult, signedIn, saveProfileFromAnswers, saveResult, clearRecall } =
     useFamilyProfile<NourishResponse>(tool.id);
 
   const handleRecall = useCallback(() => {
@@ -641,9 +642,9 @@ export default function NourishTool() {
           </section>
         )}
 
-        <PremiumWaitlistCard toolId={tool.id} />
-
         <RecommendationDisclaimer tool="nourish" />
+        <SaveAccountNudge signedIn={signedIn} />
+        <PremiumWaitlistCard toolId={tool.id} />
         <CrossToolFooter currentToolId={tool.id} />
       </div>
     </div>

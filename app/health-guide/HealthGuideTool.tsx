@@ -7,6 +7,7 @@ import EmailCapture from '@/components/EmailCapture';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
 import LastResultCard from '@/components/LastResultCard';
+import SaveAccountNudge from '@/components/SaveAccountNudge';
 import { postTool, RateLimitError } from '@/lib/tool-client';
 import { useFamilyProfile } from '@/lib/useFamilyProfile';
 import PlanCard from '@/components/PlanCard';
@@ -664,7 +665,7 @@ export default function HealthGuideTool() {
   const [emailData, setEmailData] = useState<Record<string, unknown>>({});
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string | string[] | number>>({});
   const [error, setError] = useState(false);
-  const { ready, initialAnswers, lastResult, saveProfileFromAnswers, saveResult, clearRecall } =
+  const { ready, initialAnswers, lastResult, signedIn, saveProfileFromAnswers, saveResult, clearRecall } =
     useFamilyProfile<HealthSnapshot>(tool.id);
   const snapshotRef = useRef<HealthSnapshot | null>(null);
 
@@ -1048,9 +1049,9 @@ export default function HealthGuideTool() {
           </div>
         </section>
 
-        <PremiumWaitlistCard toolId={tool.id} />
-
         <RecommendationDisclaimer tool="health" />
+        <SaveAccountNudge signedIn={signedIn} />
+        <PremiumWaitlistCard toolId={tool.id} />
         <CrossToolFooter currentToolId={tool.id} />
       </div>
     </div>

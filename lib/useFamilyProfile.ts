@@ -26,11 +26,18 @@ export function useFamilyProfile<TResult = unknown>(toolId: ToolId) {
   const [ready, setReady] = useState(false);
   const [initialAnswers, setInitialAnswers] = useState<QuizAnswers>({});
   const [lastResult, setLastResult] = useState<TResult | null>(null);
+  // null = session not resolved yet (keeps the post-result nudge hidden until we
+  // know for sure — a signed-in user must never see even a frame of it).
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (active) setSignedIn(!!user);
         const profile = await getFamilyProfile(supabase);
         if (active && profile) setInitialAnswers(profileToInitialAnswers(profile, toolId));
         const last = await getLastResult<TResult>(supabase, toolId);
@@ -62,5 +69,5 @@ export function useFamilyProfile<TResult = unknown>(toolId: ToolId) {
 
   const clearRecall = useCallback(() => setLastResult(null), []);
 
-  return { ready, initialAnswers, lastResult, saveProfileFromAnswers, saveResult, clearRecall };
+  return { ready, initialAnswers, lastResult, signedIn, saveProfileFromAnswers, saveResult, clearRecall };
 }
