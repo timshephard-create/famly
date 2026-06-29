@@ -256,10 +256,9 @@ export default function BrightWatchTool() {
           </a>
         </section>
 
-        <PremiumWaitlistCard toolId={tool.id} />
-
         <RecommendationDisclaimer tool="brightwatch" />
         <SaveAccountNudge signedIn={signedIn} />
+        <PremiumWaitlistCard toolId={tool.id} />
         <CrossToolFooter currentToolId={tool.id} />
       </div>
     </div>

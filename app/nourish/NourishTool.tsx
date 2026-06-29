@@ -642,10 +642,9 @@ export default function NourishTool() {
           </section>
         )}
 
-        <PremiumWaitlistCard toolId={tool.id} />
-
         <RecommendationDisclaimer tool="nourish" />
         <SaveAccountNudge signedIn={signedIn} />
+        <PremiumWaitlistCard toolId={tool.id} />
         <CrossToolFooter currentToolId={tool.id} />
       </div>
     </div>
